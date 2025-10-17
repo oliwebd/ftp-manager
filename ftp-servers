@@ -1,0 +1,108 @@
+#!/bin/bash
+# Manage multiple FTP servers with timestamps, colors, and dynamic add
+
+CONFIG="/usr/local/bin/ftp-servers.conf"
+
+# Colors
+GREEN="\e[32m"
+YELLOW="\e[33m"
+RED="\e[31m"
+RESET="\e[0m"
+
+timestamp() {
+  date +"%Y-%m-%d %H:%M:%S"
+}
+
+read_servers() {
+  SERVERS=()
+  if [ -f "$CONFIG" ]; then
+    while IFS= read -r line; do
+      [ -n "$line" ] && SERVERS+=("$line")
+    done < "$CONFIG"
+  fi
+}
+
+start_servers() {
+  for s in "${SERVERS[@]}"; do
+    PORT="${s%%:*}"
+    DIR="${s##*:}"
+    LOG="$DIR/ftp.log"
+    if ! pgrep -f "pyftpdlib -p $PORT" > /dev/null; then
+      nohup python3 -m pyftpdlib -p "$PORT" -w -d "$DIR" >> "$LOG" 2>&1 &
+      echo -e "${GREEN}[$(timestamp)] Started FTP on port $PORT${RESET}, logs: $LOG"
+    else
+      echo -e "${YELLOW}[$(timestamp)] FTP on port $PORT already running${RESET}"
+    fi
+  done
+}
+
+stop_servers() {
+  for s in "${SERVERS[@]}"; do
+    PORT="${s%%:*}"
+    PIDS=$(pgrep -f "pyftpdlib -p $PORT")
+    if [ -n "$PIDS" ]; then
+      kill $PIDS
+      echo -e "${RED}[$(timestamp)] Stopped FTP on port $PORT${RESET}"
+    else
+      echo -e "${YELLOW}[$(timestamp)] No FTP process running on port $PORT${RESET}"
+    fi
+  done
+}
+
+add_server() {
+  NEW="$1"
+  if [ -z "$NEW" ]; then
+    echo -e "${YELLOW}Usage: $0 PORT:/path/to/dir${RESET}"
+    exit 1
+  fi
+
+  if grep -qxF "$NEW" "$CONFIG"; then
+    echo -e "${YELLOW}[$(timestamp)] Server $NEW already exists in config${RESET}"
+  else
+    echo "$NEW" >> "$CONFIG"
+    echo -e "${GREEN}[$(timestamp)] Added new FTP server: $NEW${RESET}"
+
+    # Immediately start the new server
+    PORT="${NEW%%:*}"
+    DIR="${NEW##*:}"
+    LOG="$DIR/ftp.log"
+    nohup python3 -m pyftpdlib -p "$PORT" -w -d "$DIR" >> "$LOG" 2>&1 &
+    echo -e "${GREEN}[$(timestamp)] Started FTP on port $PORT${RESET}, logs: $LOG"
+  fi
+}
+
+# Detect script name to map short commands
+SCRIPT_NAME="$(basename "$0")"
+
+case "$SCRIPT_NAME" in
+  ftpS) start_servers; exit 0 ;;
+  ftpX) stop_servers; exit 0 ;;
+  ftpR) stop_servers; start_servers; exit 0 ;;
+  ftpA) add_server "$1"; exit 0 ;;
+esac
+
+# Support full-word commands
+ACTION="$1"
+ARG2="$2"
+
+read_servers
+
+case "$ACTION" in
+  start)
+    start_servers
+    ;;
+  stop)
+    stop_servers
+    ;;
+  restart)
+    stop_servers
+    start_servers
+    ;;
+  add-ftp)
+    add_server "$ARG2"
+    ;;
+  *)
+    echo -e "${YELLOW}Usage: $0 {start|stop|restart|add-ftp} or ftpS/ftpX/ftpR/ftpA${RESET}"
+    exit 1
+    ;;
+esac
