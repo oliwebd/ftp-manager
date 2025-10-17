@@ -1,6 +1,5 @@
 #!/bin/bash
-# Manage multiple FTP servers with timestamps, colors, and dynamic add
-
+# FTP Manager Script with auto directory creation
 CONFIG="/usr/local/bin/ftp-servers.conf"
 
 # Colors
@@ -9,17 +8,13 @@ YELLOW="\e[33m"
 RED="\e[31m"
 RESET="\e[0m"
 
-timestamp() {
-  date +"%Y-%m-%d %H:%M:%S"
-}
+timestamp() { date +"%Y-%m-%d %H:%M:%S"; }
 
 read_servers() {
   SERVERS=()
-  if [ -f "$CONFIG" ]; then
-    while IFS= read -r line; do
-      [ -n "$line" ] && SERVERS+=("$line")
-    done < "$CONFIG"
-  fi
+  [ -f "$CONFIG" ] && while IFS= read -r line; do
+    [ -n "$line" ] && SERVERS+=("$line")
+  done < "$CONFIG"
 }
 
 start_servers() {
@@ -27,6 +22,7 @@ start_servers() {
     PORT="${s%%:*}"
     DIR="${s##*:}"
     LOG="$DIR/ftp.log"
+    mkdir -p "$DIR"
     if ! pgrep -f "pyftpdlib -p $PORT" > /dev/null; then
       nohup python3 -m pyftpdlib -p "$PORT" -w -d "$DIR" >> "$LOG" 2>&1 &
       echo -e "${GREEN}[$(timestamp)] Started FTP on port $PORT${RESET}, logs: $LOG"
@@ -57,27 +53,29 @@ add_server() {
   fi
 
   if grep -qxF "$NEW" "$CONFIG"; then
-    echo -e "${YELLOW}[$(timestamp)] Server $NEW already exists in config${RESET}"
+    echo -e "${YELLOW}[$(timestamp)] Server $NEW already exists${RESET}"
   else
     echo "$NEW" >> "$CONFIG"
-    echo -e "${GREEN}[$(timestamp)] Added new FTP server: $NEW${RESET}"
+    echo -e "${GREEN}[$(timestamp)] Added FTP server: $NEW${RESET}"
 
-    # Immediately start the new server
     PORT="${NEW%%:*}"
     DIR="${NEW##*:}"
     LOG="$DIR/ftp.log"
+
+    # Auto-create directory if it doesn't exist
+    mkdir -p "$DIR"
+
     nohup python3 -m pyftpdlib -p "$PORT" -w -d "$DIR" >> "$LOG" 2>&1 &
     echo -e "${GREEN}[$(timestamp)] Started FTP on port $PORT${RESET}, logs: $LOG"
   fi
 }
 
-# Detect script name to map short commands
 SCRIPT_NAME="$(basename "$0")"
 
 case "$SCRIPT_NAME" in
-  ftpS) start_servers; exit 0 ;;
-  ftpX) stop_servers; exit 0 ;;
-  ftpR) stop_servers; start_servers; exit 0 ;;
+  ftpS) read_servers; start_servers; exit 0 ;;
+  ftpX) read_servers; stop_servers; exit 0 ;;
+  ftpR) read_servers; stop_servers; start_servers; exit 0 ;;
   ftpA) add_server "$1"; exit 0 ;;
 esac
 
@@ -88,21 +86,9 @@ ARG2="$2"
 read_servers
 
 case "$ACTION" in
-  start)
-    start_servers
-    ;;
-  stop)
-    stop_servers
-    ;;
-  restart)
-    stop_servers
-    start_servers
-    ;;
-  add-ftp)
-    add_server "$ARG2"
-    ;;
-  *)
-    echo -e "${YELLOW}Usage: $0 {start|stop|restart|add-ftp} or ftpS/ftpX/ftpR/ftpA${RESET}"
-    exit 1
-    ;;
+  start) start_servers ;;
+  stop) stop_servers ;;
+  restart) stop_servers; start_servers ;;
+  add-ftp) add_server "$ARG2" ;;
+  *) echo -e "${YELLOW}Usage: $0 {start|stop|restart|add-ftp} or ftpS/ftpX/ftpR/ftpA${RESET}"; exit 1 ;;
 esac
