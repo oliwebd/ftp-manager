@@ -12,6 +12,7 @@ TARGET_DIR="/usr/local/bin"
 echo "Installing FTP Manager..."
 
 # Download ftp-servers
+# NOTE: Ensure the script at this URL includes the 'ftpO' case
 sudo curl -fsSL "$SCRIPT_URL" -o "$TARGET_DIR/ftp-servers"
 sudo chmod +x "$TARGET_DIR/ftp-servers"
 
@@ -25,6 +26,10 @@ sudo ln -sf "$TARGET_DIR/ftp-servers" "$TARGET_DIR/ftpS"
 sudo ln -sf "$TARGET_DIR/ftp-servers" "$TARGET_DIR/ftpX"
 sudo ln -sf "$TARGET_DIR/ftp-servers" "$TARGET_DIR/ftpR"
 sudo ln -sf "$TARGET_DIR/ftp-servers" "$TARGET_DIR/ftpA"
+# -------------------------------------------------------------------
+# NEW: Symlink for ftpO (Clear All Config and Stop)
+# -------------------------------------------------------------------
+sudo ln -sf "$TARGET_DIR/ftp-servers" "$TARGET_DIR/ftpO"
 
 echo "FTP Manager installed successfully!"
-echo "Use ftpS/ftpX/ftpR/ftpA commands to manage your servers."
+echo "Use ftpS/ftpX/ftpR/ftpA/ftpO commands to manage your servers."
