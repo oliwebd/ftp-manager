@@ -70,6 +70,24 @@ add_server() {
   fi
 }
 
+# ----------------------------------------------------------------------
+# NEW FUNCTION FOR ftpO COMMAND
+# ----------------------------------------------------------------------
+clear_all_config_and_stop() {
+  # 1. Stop all currently configured services
+  read_servers
+  stop_servers
+
+  # 2. Clear the configuration file
+  if [ -f "$CONFIG" ]; then
+    rm "$CONFIG"
+    echo -e "${RED}[$(timestamp)] Removed configuration file: $CONFIG${RESET}"
+  else
+    echo -e "${YELLOW}[$(timestamp)] Configuration file not found: $CONFIG${RESET}"
+  fi
+}
+# ----------------------------------------------------------------------
+
 SCRIPT_NAME="$(basename "$0")"
 
 case "$SCRIPT_NAME" in
@@ -77,6 +95,11 @@ case "$SCRIPT_NAME" in
   ftpX) read_servers; stop_servers; exit 0 ;;
   ftpR) read_servers; stop_servers; start_servers; exit 0 ;;
   ftpA) add_server "$1"; exit 0 ;;
+  # ----------------------------------------------------------------------
+  # NEW CASE FOR ftpO COMMAND
+  # ----------------------------------------------------------------------
+  ftpO) clear_all_config_and_stop; exit 0 ;;
+  # ----------------------------------------------------------------------
 esac
 
 # Support full-word commands
@@ -90,5 +113,7 @@ case "$ACTION" in
   stop) stop_servers ;;
   restart) stop_servers; start_servers ;;
   add-ftp) add_server "$ARG2" ;;
-  *) echo -e "${YELLOW}Usage: $0 {start|stop|restart|add-ftp} or ftpS/ftpX/ftpR/ftpA${RESET}"; exit 1 ;;
+  # You might want to add a 'clear-all' full-word command here too
+  clear-all) clear_all_config_and_stop ;;
+  *) echo -e "${YELLOW}Usage: $0 {start|stop|restart|add-ftp|clear-all} or ftpS/ftpX/ftpR/ftpA/ftpO${RESET}"; exit 1 ;;
 esac
